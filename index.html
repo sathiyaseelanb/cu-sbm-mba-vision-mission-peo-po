@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SBM Institutional Alignment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  if (window.tailwind) {
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'] },
+      colors: { navy: 'var(--navy)', ink: 'var(--ink)', slate2: 'var(--slate)', line: 'var(--line)', tint: 'var(--tint)', paper: 'var(--paper)', ok: 'var(--emerald)', oktint: 'var(--emerald-tint)' }
+    } } };
+  }
+</script>
+<style>
+  /* Layout: one task per screen in a fixed three-row frame (header, scrolling stage, arrow bar), single 720px column. */
+  :root {
+    --navy: #0C2340;
+    --navy-2: #1D3C66;
+    --ink: #16233A;
+    --slate: #52627A;
+    --line: #D3DAE5;
+    --tint: #F1F4F8;
+    --paper: #FFFFFF;
+    --emerald: #0A7350;
+    --emerald-tint: #E2F3EB;
+    --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color-scheme: light;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.5; -webkit-text-size-adjust: 100%; }
+  *, *::before, *::after { box-sizing: border-box; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+  button:disabled { cursor: default; }
+  h1, h2, p { margin: 0; }
+  :focus-visible { outline: 3px solid var(--navy-2); outline-offset: 2px; }
+
+  #app { height: 100%; display: flex; flex-direction: column; }
+  .wrap { width: 100%; max-width: 720px; margin-inline: auto; padding-inline: 16px; }
+
+  .top { border-bottom: 1px solid var(--line); background: var(--paper); padding-block: 12px; }
+  .top-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .top-module { font-weight: 600; color: var(--navy); min-width: 0; }
+  .top-count { color: var(--slate); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .segments { display: grid; grid-template-columns: 4fr 6fr 8fr; gap: 6px; margin-top: 10px; }
+  .seg { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .seg > i { display: block; height: 100%; width: 0; background: var(--navy); transition: width .3s ease; }
+
+  #stage { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .screen { padding-block: 24px 32px; display: flex; flex-direction: column; gap: 20px; animation: enter .28s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .screen { animation: none; } .seg > i { transition: none; } }
+
+  .eyebrow { color: var(--slate); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+  .title { font-size: 28px; line-height: 1.2; font-weight: 600; color: var(--navy); text-wrap: balance; }
+  .title:focus { outline: none; }
+  .lede { color: var(--slate); }
+  .intro { border-left: 3px solid var(--navy); padding-left: 14px; color: var(--ink); }
+
+  /* form */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-weight: 500; color: var(--navy); }
+  .field input, .field select { width: 100%; min-height: 52px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--paper); }
+  .field input:focus, .field select:focus { border-color: var(--navy); outline: none; box-shadow: 0 0 0 3px rgba(29, 60, 102, .18); }
+
+  /* statement with blanks */
+  .statement { background: var(--tint); border-radius: 8px; padding: 20px 18px; font-size: 21px; line-height: 2.7; color: var(--navy); font-weight: 500; }
+  .blank { display: inline-flex; align-items: center; justify-content: center; min-width: 110px; min-height: 48px; padding: 4px 12px; margin-inline: 2px; vertical-align: middle; line-height: 1.25; text-align: center; border: 1.5px dashed var(--slate); border-radius: 6px; background: var(--paper); color: var(--slate); font-weight: 400; }
+  .blank.sel { border-style: solid; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(29, 60, 102, .18); }
+  .blank.filled { border: 1.5px solid var(--emerald); background: var(--emerald-tint); color: var(--emerald); font-weight: 600; }
+  .bank { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { min-height: 48px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: 24px; background: var(--paper); color: var(--ink); line-height: 1.25; text-align: center; }
+  .chip.sel { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+  .chip:disabled { opacity: .45; }
+
+  /* choice screens */
+  .situation { background: var(--tint); border-radius: 8px; padding: 18px; font-size: 20px; line-height: 1.45; color: var(--navy); font-weight: 500; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; min-height: 48px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--paper); line-height: 1.35; }
+  .opt .tag { flex: none; font-weight: 600; color: var(--navy); min-width: 3.2em; }
+  .opt .txt { min-width: 0; }
+  .opt .mark { display: block; font-weight: 500; margin-top: 2px; }
+  .opt.wrong { background: var(--tint); color: var(--slate); border-style: dashed; }
+  .opt.wrong .tag { color: var(--slate); }
+  .opt.right { background: var(--emerald-tint); border-color: var(--emerald); }
+  .opt.right .tag, .opt.right .mark { color: var(--emerald); }
+  .opt.idle { opacity: .55; }
+
+  .notice { min-height: 1.5em; color: var(--slate); }
+  .why { background: var(--emerald-tint); border-radius: 8px; padding: 14px 16px; color: var(--ink); }
+  .why b { color: var(--emerald); font-weight: 600; }
+
+  /* summary */
+  .index-num { font-size: 64px; line-height: 1; font-weight: 600; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .rows { display: flex; flex-direction: column; gap: 14px; }
+  .row-head { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: var(--navy); }
+  .sub { font-size: 20px; font-weight: 600; color: var(--navy); }
+  .missed { display: flex; flex-direction: column; gap: 14px; padding: 0; margin: 0; list-style: none; }
+  .missed li { border-top: 1px solid var(--line); padding-top: 14px; }
+  .missed .ans { color: var(--emerald); font-weight: 500; }
+  .closing { font-size: 21px; line-height: 1.4; color: var(--navy); font-weight: 500; border-left: 3px solid var(--navy); padding-left: 14px; }
+  .panel { background: var(--tint); border-radius: 8px; padding: 18px; }
+  .panel ol { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .panel ol b { color: var(--navy); font-weight: 600; display: inline-block; min-width: 3.4em; }
+
+  /* certificate */
+  .cert-frame { border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(12, 35, 64, .12); }
+  #cert { display: block; width: 100%; height: auto; aspect-ratio: 297 / 210; max-width: 100%; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 10px 20px; border-radius: 6px; font-weight: 600; text-align: center; }
+  .btn-primary { background: var(--navy); color: var(--paper); }
+  .btn-primary:disabled { background: var(--line); color: var(--slate); }
+  .btn-ghost { border: 1.5px solid var(--navy); color: var(--navy); background: var(--paper); }
+  .actions { display: flex; flex-direction: column; gap: 12px; }
+  @media (min-width: 560px) { .actions { flex-direction: row; flex-wrap: wrap; } }
+
+  .bottom { border-top: 1px solid var(--line); background: var(--paper); padding-block: 10px; }
+  .bottom-row { display: flex; justify-content: space-between; gap: 12px; }
+  .bottom .btn { min-width: 132px; }
+  .arrow { font-size: 22px; line-height: 1; }
+
+  @media (min-width: 720px) { .title { font-size: 32px; } .screen { padding-block: 36px 48px; } }
+
+  @media print {
+    .top, .bottom, .screen > :not(.cert-frame) { display: none !important; }
+    #stage { overflow: visible; }
+    .cert-frame { border: 0; box-shadow: none; }
+    @page { size: A4 landscape; margin: 0; }
+  }
+</style>
+
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="wrap">
+      <div class="top-row">
+        <span class="top-module" id="modName">Welcome</span>
+        <span class="top-count" id="count">Screen 1 of 21</span>
+      </div>
+      <div class="segments" aria-hidden="true">
+        <div class="seg"><i id="seg1"></i></div>
+        <div class="seg"><i id="seg2"></i></div>
+        <div class="seg"><i id="seg3"></i></div>
+      </div>
+    </div>
+  </header>
+
+  <main id="stage"><div class="wrap"><div class="screen" id="screen"></div></div></main>
+
+  <nav class="bottom" aria-label="Screen navigation">
+    <div class="wrap bottom-row">
+      <button type="button" class="btn btn-ghost" id="backBtn"><span class="arrow" aria-hidden="true">&larr;</span><span>Back</span></button>
+      <button type="button" class="btn btn-primary ml-auto" id="nextBtn"><span id="nextLabel">Next</span><span class="arrow" aria-hidden="true">&rarr;</span></button>
+    </div>
+  </nav>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Content (exact wording) ---------- */
+  var STATEMENTS = [
+    { id: 'uv', org: 'CHRIST (Deemed to be University)', kind: 'Vision', label: 'University Vision',
+      parts: [{ a: 'Excellence' }, ' and ', { a: 'Service' }],
+      note: 'Two words set the standard for everything the University does: do the work well, and do it for others.' },
+    { id: 'um', org: 'CHRIST (Deemed to be University)', kind: 'Mission', label: 'University Mission',
+      parts: ['CHRIST (Deemed to be University) is a ', { a: 'nurturing ground' }, ' for an individual’s ', { a: 'holistic development' }, ' to make effective contribution to the society in a ', { a: 'dynamic environment' }, '.'],
+      note: 'The University sees its role as developing the whole person, so that each one can contribute to a society that keeps changing.' },
+    { id: 'sv', org: 'School of Business and Management', kind: 'Vision', label: 'SBM Vision',
+      parts: ['Our vision is to be an institution of excellence developing leaders serving ', { a: 'enterprises and society' }, ' ', { a: 'globally' }],
+      note: 'SBM measures itself by the leaders it develops and by how far their service reaches, in business and in society, across the world.' },
+    { id: 'sm', org: 'School of Business and Management', kind: 'Mission', label: 'SBM Mission',
+      parts: ['Our mission is to develop ', { a: 'socially responsible' }, ' business leaders with the ', { a: 'spirit of inquiry' }, ' through ', { a: 'academic and industry engagement' }],
+      note: 'SBM builds responsible, curious leaders by joining classroom learning with real engagement with industry.' }
+  ];
+  var DISTRACTORS = ['ethical integrity', 'research and consultancy', 'nationally'];
+
+  var PEOS = [
+    'Graduates possessing subject knowledge, analytical ability and skills to manage business.',
+    'Graduates exhibiting spirit of inquiry, innovation and ability to solve problems in dynamic business environment.',
+    'Graduates with value based leadership skills, entrepreneurial capabilities and global awareness serving enterprises and society.'
+  ];
+  var PEO_ITEMS = [
+    { t: 'A graduate analyst builds a cost model from sales and operations data to recommend which product line to discontinue.', ans: 0, why: 'Turning data into a sound business recommendation draws on subject knowledge and analytical ability.' },
+    { t: 'A management trainee draws on her grounding in finance, marketing and operations to run a retail outlet’s monthly performance review.', ans: 0, why: 'Running a review across business functions shows the subject knowledge and skills needed to manage business.' },
+    { t: 'When a competitor’s app erodes market share, a graduate questions long-held assumptions, runs customer experiments and pilots a new service model.', ans: 1, why: 'Questioning assumptions, experimenting and piloting something new is the spirit of inquiry and innovation at work in a changing market.' },
+    { t: 'A graduate investigates why attrition rose after a policy change and devises an untried solution as conditions keep shifting.', ans: 1, why: 'Finding the cause and devising a fresh solution while conditions shift is inquiry and problem solving in a dynamic business environment.' },
+    { t: 'A graduate founder drops a profitable supplier found using unfair labour practices and builds the venture around serving rural communities.', ans: 2, why: 'Putting values ahead of profit while building a venture that serves society shows value based leadership and entrepreneurial capability.' },
+    { t: 'A team lead coordinating colleagues in three countries adapts to cultural differences and holds everyone to shared ethical standards.', ans: 2, why: 'Leading across countries while holding to shared ethical standards combines value based leadership with global awareness.' }
+  ];
+
+  var POS = [
+    'Apply knowledge of Management and Practices to solve business problems',
+    'Foster Analytical and Critical abilities for data based decision making',
+    'Ability to develop value-based leadership ability',
+    'Ability to understand, analyse, communicate global economic, legal and ethical aspects of business',
+    'Ability to lead themselves and others in the achievement of organizational goals, contributing effectively to the team environment',
+    'Identify business opportunities, design and implement innovations in the work environment',
+    'Enhance capabilities for generating research ideas in respective management domains',
+    'Demonstrate sensitivity to sustainability issues and prepare for lifelong learning'
+  ];
+  var PO_ITEMS = [
+    { t: 'Uses an operations management framework to fix a client’s recurring delivery delays.', ans: 0, why: 'A management framework is being applied to solve a real business problem.' },
+    { t: 'Tests a pricing hypothesis against customer data before making a recommendation.', ans: 1, why: 'The decision rests on analysing data critically before acting.' },
+    { t: 'Under pressure to inflate quarterly figures, acts on principle and brings the team along.', ans: 2, why: 'Leading others by holding to principle under pressure is value-based leadership.' },
+    { t: 'Writes a briefing on how a new trade regulation and exchange-rate shifts affect the firm’s export contracts.', ans: 3, why: 'The briefing analyses and communicates the global economic and legal side of the business.' },
+    { t: 'Sets personal targets, coordinates a cross-functional team and supports a struggling colleague to meet a deadline.', ans: 4, why: 'This is leading oneself and others towards an organisational goal while contributing to the team.' },
+    { t: 'Spots an unmet customer need, then designs and rolls out a new process at work.', ans: 5, why: 'An opportunity is identified, then an innovation is designed and implemented in the workplace.' },
+    { t: 'Notices a gap in what is known about gig-worker motivation and frames it as a research question.', ans: 6, why: 'Turning a gap in knowledge into a research question is generating a research idea in a management domain.' },
+    { t: 'Reviews the unit’s environmental footprint and enrols in a course to keep skills current.', ans: 7, why: 'Attention to environmental impact shows sensitivity to sustainability, and continued study is lifelong learning.' }
+  ];
+
+  var PCGS = ['Social Responsibility and Ethical Sensitivity', 'Functional Knowledge and Application', 'Communication', 'Critical Thinking', 'Global Awareness'];
+
+  var CLOSING = {
+    Student: 'These statements describe what your two years at SBM are designed to build in you.',
+    Faculty: 'These statements are the reference point for every course you design and assess.',
+    Staff: 'These statements are the purpose your work at SBM supports every day.',
+    Alumni: 'These statements describe the standard your degree continues to stand for.',
+    Parent: 'These statements describe what SBM commits to developing in your son or daughter.',
+    Recruiter: 'These statements describe what you can expect from an SBM graduate you hire.',
+    Other: 'These statements describe what SBM stands for and works towards.'
+  };
+  var ROLES = ['Student', 'Faculty', 'Staff', 'Alumni', 'Parent', 'Recruiter', 'Other'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var TOTAL_SCREENS = 21, TOTAL_ITEMS = 24;
+
+  /* ---------- State ---------- */
+  var S;
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function allBlanks() {
+    var out = [];
+    STATEMENTS.forEach(function (st) {
+      st.parts.forEach(function (p, i) { if (typeof p !== 'string') out.push({ id: st.id + '-' + i, answer: p.a, st: st }); });
+    });
+    return out;
+  }
+  function freshState() {
+    var phrases = allBlanks().map(function (b) { return b.answer; }).concat(DISTRACTORS);
+    return {
+      i: 0,
+      form: { name: '', role: '', other: '', date: todayISO() },
+      m1: { bank: shuffle(phrases).map(function (t) { return { text: t, used: false }; }), filled: {}, first: {}, selPhrase: null, selBlank: null, notice: '' },
+      m2: { order: shuffle([0, 1, 2, 3, 4, 5]), res: {} },
+      m3: { order: shuffle([0, 1, 2, 3, 4, 5, 6, 7]), res: {} },
+      notice: '',
+      confirmRestart: false
+    };
+  }
+
+  /* ---------- Helpers ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function info(i) {
+    if (i === 0) return { type: 'open', mod: 'Welcome' };
+    if (i <= 4) return { type: 'm1', k: i - 1, mod: 'Module 1 · Vision and Mission' };
+    if (i <= 10) return { type: 'm2', k: i - 5, mod: 'Module 2 · PEOs in Practice' };
+    if (i <= 18) return { type: 'm3', k: i - 11, mod: 'Module 3 · Program Outcomes in Action' };
+    if (i === 19) return { type: 'summary', mod: 'Summary' };
+    return { type: 'cert', mod: 'Certificate' };
+  }
+  function stBlanks(st) { return allBlanks().filter(function (b) { return b.st === st; }); }
+  function stDone(st) { return stBlanks(st).every(function (b) { return S.m1.filled[b.id]; }); }
+  function formValid() {
+    var f = S.form;
+    if (f.name.trim().length < 2) return false;
+    if (ROLES.indexOf(f.role) < 0) return false;
+    if (f.role === 'Other' && f.other.trim().length < 2) return false;
+    return parseDate(f.date) !== null;
+  }
+  function parseDate(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], d = +m[3];
+    var dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return { y: y, m: mo, d: d };
+  }
+  function niceDate() { var p = parseDate(S.form.date); return p ? p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y : ''; }
+  function stakeholder() { return S.form.role === 'Other' ? S.form.other.trim() : S.form.role; }
+  function canNext(i) {
+    var x = info(i);
+    if (x.type === 'open') return formValid();
+    if (x.type === 'm1') return stDone(STATEMENTS[x.k]);
+    if (x.type === 'm2') return !!(S.m2.res[S.m2.order[x.k]] || {}).done;
+    if (x.type === 'm3') return !!(S.m3.res[S.m3.order[x.k]] || {}).done;
+    return x.type === 'summary';
+  }
+  function scores() {
+    var b = allBlanks();
+    var s1 = b.filter(function (x) { return S.m1.first[x.id] === true; }).length;
+    var cnt = function (m) { return Object.keys(m.res).filter(function (k) { return m.res[k].first === true; }).length; };
+    var s2 = cnt(S.m2), s3 = cnt(S.m3);
+    return { m1: s1, m2: s2, m3: s3, total: s1 + s2 + s3, pct: Math.round((s1 + s2 + s3) / TOTAL_ITEMS * 100) };
+  }
+
+  /* ---------- Chrome (header + arrows) ---------- */
+  function renderChrome() {
+    var x = info(S.i);
+    $('modName').textContent = x.mod;
+    $('count').textContent = 'Screen ' + (S.i + 1) + ' of ' + TOTAL_SCREENS;
+    var d1 = STATEMENTS.filter(stDone).length;
+    var d2 = Object.keys(S.m2.res).filter(function (k) { return S.m2.res[k].done; }).length;
+    var d3 = Object.keys(S.m3.res).filter(function (k) { return S.m3.res[k].done; }).length;
+    $('seg1').style.width = (d1 / 4 * 100) + '%';
+    $('seg2').style.width = (d2 / 6 * 100) + '%';
+    $('seg3').style.width = (d3 / 8 * 100) + '%';
+    $('backBtn').hidden = S.i === 0;
+    $('nextBtn').hidden = x.type === 'cert';
+    $('nextBtn').disabled = !canNext(S.i);
+    $('nextLabel').textContent = x.type === 'open' ? 'Begin' : x.type === 'summary' ? 'View certificate' : 'Next';
+  }
+
+  /* ---------- Screens ---------- */
+  function head(eyebrow, title) {
+    return '<div><p class="eyebrow">' + esc(eyebrow) + '</p><h1 class="title" id="screenTitle" tabindex="-1">' + esc(title) + '</h1></div>';
+  }
+
+  function viewOpen() {
+    var f = S.form;
+    var opts = '<option value="" disabled' + (f.role ? '' : ' selected') + '>Select one</option>' + ROLES.map(function (r) {
+      return '<option value="' + r + '"' + (f.role === r ? ' selected' : '') + '>' + r + '</option>';
+    }).join('');
+    return head('School of Business and Management', 'Know what SBM stands for') +
+      '<p class="lede">Work through the Vision, Mission, Programme Educational Objectives and Program Outcomes of CHRIST (Deemed to be University) and its School of Business and Management. It takes about 10 minutes, and you receive a named certificate at the end.</p>' +
+      '<form id="openForm" class="flex flex-col gap-5" novalidate>' +
+        '<div class="field"><label for="fName">Your name, as it should appear on the certificate</label><input id="fName" type="text" autocomplete="name" maxlength="80" value="' + esc(f.name) + '"></div>' +
+        '<div class="field"><label for="fRole">I am responding as</label><select id="fRole">' + opts + '</select></div>' +
+        '<div class="field" id="otherWrap"' + (f.role === 'Other' ? '' : ' hidden') + '><label for="fOther">Please specify</label><input id="fOther" type="text" maxlength="80" value="' + esc(f.other) + '"></div>' +
+        '<div class="field"><label for="fDate">Date of response</label><input id="fDate" type="date" value="' + esc(f.date) + '"></div>' +
+      '</form>' +
+      '<p class="notice" id="formHint">' + (formValid() ? '' : 'Fill in every field to begin.') + '</p>';
+  }
+
+  function viewM1(k) {
+    var st = STATEMENTS[k], m = S.m1, done = stDone(st);
+    var body = st.parts.map(function (p, i) {
+      if (typeof p === 'string') return esc(p);
+      var id = st.id + '-' + i;
+      if (m.filled[id]) return '<span class="blank filled">' + esc(p.a) + '</span>';
+      return '<button type="button" class="blank' + (m.selBlank === id ? ' sel' : '') + '" data-blank="' + id + '" aria-label="Blank. Tap to fill.">&nbsp;</button>';
+    }).join('');
+    var bank = m.bank.map(function (b, idx) {
+      if (b.used) return '';
+      return '<button type="button" class="chip' + (m.selPhrase === idx ? ' sel' : '') + '" data-phrase="' + idx + '"' + (done ? ' disabled' : '') + '>' + esc(b.text) + '</button>';
+    }).join('');
+    return head(st.org, st.kind) +
+      (k === 0 ? '<p class="intro">Tap a phrase, then tap the blank where it belongs. Three of the phrases belong nowhere.</p>' : '') +
+      '<div class="statement">' + body + '</div>' +
+      (done
+        ? '<p class="why"><b>Complete.</b> ' + esc(st.note) + '</p>'
+        : '<p class="notice" role="status">' + esc(m.notice) + '</p><div class="bank">' + bank + '</div>');
+  }
+
+  function viewChoice(modKey, k) {
+    var isPeo = modKey === 'm2';
+    var M = S[modKey], items = isPeo ? PEO_ITEMS : PO_ITEMS, texts = isPeo ? PEOS : POS;
+    var idx = M.order[k], item = items[idx], r = M.res[idx] || { wrong: [], done: false };
+    var introLine = isPeo
+      ? 'Programme Educational Objectives describe what SBM graduates are expected to be doing a few years into their careers.'
+      : 'Program Outcomes describe what every MBA student should be able to do by the time they graduate.';
+    var opts = texts.map(function (t, n) {
+      var tag = (isPeo ? 'PEO ' : 'PO') + (n + 1);
+      var cls = 'opt', mark = '', dis = '';
+      if (r.done && n === item.ans) { cls += ' right'; mark = '<span class="mark">Correct</span>'; dis = ' disabled'; }
+      else if (r.wrong.indexOf(n) >= 0) { cls += ' wrong'; mark = '<span class="mark">Not this one</span>'; dis = ' disabled'; }
+      else if (r.done) { cls += ' idle'; dis = ' disabled'; }
+      return '<button type="button" class="' + cls + '" data-opt="' + n + '"' + dis + '><span class="tag">' + tag + '</span><span class="txt">' + esc(t) + mark + '</span></button>';
+    }).join('');
+    return head((isPeo ? 'Situation ' : 'Behaviour ') + (k + 1) + ' of ' + items.length, isPeo ? 'Which objective does this show?' : 'Which outcome does this show?') +
+      (k === 0 ? '<p class="intro">' + introLine + '</p>' : '') +
+      '<p class="situation">' + esc(item.t) + '</p>' +
+      (r.done
+        ? '<p class="why"><b>' + (isPeo ? 'PEO ' : 'PO') + (item.ans + 1) + '.</b> ' + esc(item.why) + '</p>'
+        : '<p class="notice" role="status">' + esc(S.notice) + '</p>') +
+      '<div class="options">' + opts + '</div>';
+  }
+
+  function viewSummary() {
+    var sc = scores();
+    var row = function (name, got, of) {
+      return '<div><div class="row-head"><span>' + name + '</span><span>' + got + ' of ' + of + '</span></div><div class="bar"><i style="width:' + (got / of * 100) + '%"></i></div></div>';
+    };
+    var missed = [];
+    allBlanks().forEach(function (b) {
+      if (S.m1.first[b.id] === false) missed.push({ q: b.st.label + ', missing phrase', a: b.answer });
+    });
+    PEO_ITEMS.forEach(function (it, n) { if ((S.m2.res[n] || {}).first === false) missed.push({ q: it.t, a: 'PEO ' + (it.ans + 1) + ': ' + PEOS[it.ans] }); });
+    PO_ITEMS.forEach(function (it, n) { if ((S.m3.res[n] || {}).first === false) missed.push({ q: it.t, a: 'PO' + (it.ans + 1) + ': ' + POS[it.ans] }); });
+    var missedHtml = missed.length
+      ? '<ul class="missed">' + missed.map(function (x) { return '<li><p>' + esc(x.q) + '</p><p class="ans">' + esc(x.a) + '</p></li>'; }).join('') + '</ul>'
+      : '<p class="lede">None. You placed every item correctly on your first attempt.</p>';
+    return head('Thank you, ' + S.form.name.trim(), 'Institutional Alignment Summary') +
+      '<div><p class="index-num">' + sc.pct + '%</p><p class="lede">Alignment Index: ' + sc.total + ' of ' + TOTAL_ITEMS + ' items correct on your first attempt.</p></div>' +
+      '<div class="rows">' + row('Vision and Mission', sc.m1, 10) + row('PEOs in Practice', sc.m2, 6) + row('Program Outcomes in Action', sc.m3, 8) + '</div>' +
+      '<div class="flex flex-col gap-3"><h2 class="sub">Items to revisit</h2>' + missedHtml + '</div>' +
+      '<p class="closing">' + esc(CLOSING[S.form.role] || CLOSING.Other) + '</p>' +
+      '<div class="panel"><h2 class="sub">Program Competency Goals</h2><p class="lede">For reference. These were not part of the exercise.</p><ol>' +
+        PCGS.map(function (p, n) { return '<li><b>PCG' + (n + 1) + '</b>' + esc(p) + '</li>'; }).join('') + '</ol></div>';
+  }
+
+  function viewCert() {
+    var alt = 'Certificate of Successful Completion. School of Business and Management, CHRIST (Deemed to be University). This is to certify that ' +
+      S.form.name.trim() + ', ' + stakeholder() + ', has successfully completed the Vision, Mission, Programme Educational Objectives and Program Outcomes orientation on ' + niceDate() + '.';
+    return head('Completed', 'Your certificate') +
+      '<div class="cert-frame"><canvas id="cert" width="2376" height="1680" role="img" aria-label="' + esc(alt) + '"></canvas></div>' +
+      '<p class="notice" id="certStatus" role="status"></p>' +
+      '<div class="actions">' +
+        '<button type="button" class="btn btn-primary" id="dlBtn">Download certificate (PDF)</button>' +
+        '<button type="button" class="btn btn-ghost" id="restartBtn">' + (S.confirmRestart ? 'Tap again to clear and restart' : 'Restart') + '</button>' +
+      '</div>';
+  }
+
+  function render(moveFocus) {
+    var x = info(S.i), html;
+    if (x.type === 'open') html = viewOpen();
+    else if (x.type === 'm1') html = viewM1(x.k);
+    else if (x.type === 'm2') html = viewChoice('m2', x.k);
+    else if (x.type === 'm3') html = viewChoice('m3', x.k);
+    else if (x.type === 'summary') html = viewSummary();
+    else html = viewCert();
+    var el = $('screen');
+    el.innerHTML = html;
+    if (moveFocus) {
+      el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+      $('stage').scrollTop = 0;
+      var t = $('screenTitle'); if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
+    } else {
+      el.style.animation = 'none';
+    }
+    renderChrome();
+    if (x.type === 'cert') drawCert();
+  }
+
+  function go(n) {
+    if (n < 0 || n >= TOTAL_SCREENS) return;
+    S.i = n; S.notice = ''; S.m1.notice = ''; S.m1.selBlank = null; S.m1.selPhrase = null; S.confirmRestart = false;
+    render(true);
+  }
+
+  /* ---------- Interaction ---------- */
+  function tryPlace() {
+    var m = S.m1;
+    if (m.selBlank === null || m.selPhrase === null) return;
+    var blank = allBlanks().filter(function (b) { return b.id === m.selBlank; })[0];
+    var phrase = m.bank[m.selPhrase];
+    if (blank && phrase && phrase.text === blank.answer) {
+      m.filled[blank.id] = true; phrase.used = true;
+      if (m.first[blank.id] === undefined) m.first[blank.id] = true;
+      m.notice = '';
+    } else if (blank) {
+      if (m.first[blank.id] === undefined) m.first[blank.id] = false;
+      m.notice = 'That phrase does not belong there. It is back in the list, so try another.';
+    }
+    m.selBlank = null; m.selPhrase = null;
+  }
+
+  $('screen').addEventListener('click', function (e) {
+    var x = info(S.i);
+    var t = e.target.closest('button');
+    if (!t || t.disabled) return;
+
+    if (x.type === 'm1') {
+      if (t.dataset.blank) { S.m1.selBlank = S.m1.selBlank === t.dataset.blank ? null : t.dataset.blank; }
+      else if (t.dataset.phrase) { var p = +t.dataset.phrase; S.m1.selPhrase = S.m1.selPhrase === p ? null : p; }
+      else return;
+      S.m1.notice = '';
+      // With a single open blank on screen, a tapped phrase goes straight to it.
+      if (S.m1.selPhrase !== null && S.m1.selBlank === null) {
+        var open = stBlanks(STATEMENTS[x.k]).filter(function (b) { return !S.m1.filled[b.id]; });
+        if (open.length === 1) S.m1.selBlank = open[0].id;
+      }
+      tryPlace();
+      render(false);
+      return;
+    }
+
+    if ((x.type === 'm2' || x.type === 'm3') && t.dataset.opt !== undefined) {
+      var M = S[x.type], items = x.type === 'm2' ? PEO_ITEMS : PO_ITEMS;
+      var idx = M.order[x.k], n = +t.dataset.opt;
+      var r = M.res[idx] || (M.res[idx] = { wrong: [], done: false, first: undefined });
+      if (r.done) return;
+      if (n === items[idx].ans) { r.done = true; if (r.first === undefined) r.first = true; S.notice = ''; }
+      else { r.wrong.push(n); if (r.first === undefined) r.first = false; S.notice = 'Not quite. Read the situation again and try another.'; }
+      render(false);
+      return;
+    }
+
+    if (x.type === 'cert') {
+      if (t.id === 'dlBtn') downloadCert();
+      if (t.id === 'restartBtn') {
+        if (S.confirmRestart) { S = freshState(); render(true); }
+        else { S.confirmRestart = true; t.textContent = 'Tap again to clear and restart'; }
+      }
+    }
+  });
+
+  function onFormChange(e) {
+    if (info(S.i).type !== 'open') return;
+    var id = e.target.id, f = S.form;
+    if (id === 'fName') f.name = e.target.value;
+    else if (id === 'fOther') f.other = e.target.value;
+    else if (id === 'fDate') f.date = e.target.value;
+    else if (id === 'fRole') {
+      f.role = e.target.value;
+      var isOther = f.role === 'Other';
+      $('otherWrap').hidden = !isOther;
+      if (!isOther) { f.other = ''; $('fOther').value = ''; }
+    } else return;
+    $('formHint').textContent = formValid() ? '' : 'Fill in every field to begin.';
+    renderChrome();
+  }
+  $('screen').addEventListener('input', onFormChange);
+  $('screen').addEventListener('change', onFormChange);
+  $('screen').addEventListener('submit', function (e) { e.preventDefault(); if (canNext(S.i)) go(S.i + 1); });
+
+  $('nextBtn').addEventListener('click', function () { if (canNext(S.i)) go(S.i + 1); });
+  $('backBtn').addEventListener('click', function () { go(S.i - 1); });
+
+  /* ---------- Certificate ---------- */
+  function wrapLines(ctx, text, maxW) {
+    var words = text.split(/\s+/), lines = [], line = '';
+    words.forEach(function (w) {
+      var trial = line ? line + ' ' + w : w;
+      if (ctx.measureText(trial).width > maxW && line) { lines.push(line); line = w; } else line = trial;
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+  function fitFont(ctx, text, weight, size, min, maxW) {
+    var s = size;
+    do { ctx.font = weight + ' ' + s + 'px "IBM Plex Sans", Arial, sans-serif'; if (ctx.measureText(text).width <= maxW) break; s -= 4; } while (s > min);
+    return s;
+  }
+  function paintCert() {
+    var c = $('cert'); if (!c) return null;
+    var ctx = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2;
+    var css = getComputedStyle(document.documentElement);
+    var navy = css.getPropertyValue('--navy').trim() || '#0C2340';
+    var slate = css.getPropertyValue('--slate').trim() || '#52627A';
+    var ink = css.getPropertyValue('--ink').trim() || '#16233A';
+    var fam = '"IBM Plex Sans", Arial, sans-serif';
+
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = navy; ctx.lineWidth = 18; ctx.strokeRect(69, 69, W - 138, H - 138);
+    ctx.lineWidth = 3; ctx.strokeRect(108, 108, W - 216, H - 216);
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = slate;
+    fitFont(ctx, 'School of Business and Management, CHRIST (Deemed to be University)', 500, 56, 36, 1960);
+    ctx.fillText('School of Business and Management, CHRIST (Deemed to be University)', cx, 360);
+
+    ctx.fillStyle = navy; ctx.font = '600 108px ' + fam;
+    ctx.fillText('Certificate of Successful Completion', cx, 540);
+    ctx.fillRect(cx - 110, 596, 220, 5);
+
+    ctx.fillStyle = slate; ctx.font = '400 56px ' + fam;
+    ctx.fillText('This is to certify that', cx, 740);
+
+    var name = S.form.name.trim();
+    ctx.fillStyle = navy;
+    fitFont(ctx, name, 600, 164, 64, 1960);
+    ctx.fillText(name, cx, 930);
+
+    var who = stakeholder();
+    ctx.fillStyle = navy;
+    fitFont(ctx, who, 500, 64, 34, 1900);
+    ctx.fillText(who, cx, 1040);
+
+    ctx.fillStyle = ink; ctx.font = '400 56px ' + fam;
+    var lines = wrapLines(ctx, 'has successfully completed the Vision, Mission, Programme Educational Objectives and Program Outcomes orientation on ' + niceDate() + '.', 1820);
+    lines.forEach(function (l, n) { ctx.fillText(l, cx, 1190 + n * 84); });
+    return c;
+  }
+  function drawCert() {
+    paintCert();
+    if (!document.fonts || !document.fonts.load) return Promise.resolve($('cert'));
+    return Promise.all([
+      document.fonts.load('400 50px "IBM Plex Sans"'),
+      document.fonts.load('500 50px "IBM Plex Sans"'),
+      document.fonts.load('600 108px "IBM Plex Sans"')
+    ]).catch(function () {}).then(function () { return paintCert(); });
+  }
+
+  var busy = false;
+  function downloadCert() {
+    if (busy) return;
+    var status = $('certStatus'), btn = $('dlBtn');
+    var say = function (m) { var s = $('certStatus'); if (s) s.textContent = m; };
+    busy = true; btn.disabled = true; say('Preparing your certificate…');
+    var done = function () { busy = false; var b = $('dlBtn'); if (b) b.disabled = false; };
+    var safe = S.form.name.trim().replace(/[^A-Za-z0-9À-￿]+/g, '-').replace(/^-+|-+$/g, '') || 'Participant';
+    var filename = 'SBM-Certificate-' + safe + '.pdf';
+
+    drawCert().then(function (canvas) {
+      if (!window.jspdf || !window.jspdf.jsPDF) throw { code: 'no_pdf' };
+      var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', 0, 0, 297, 210);
+      if (window.claude && typeof window.claude.use === 'function') {
+        return window.claude.use('downloads').then(function (dl) {
+          if (dl) return dl.save({ filename: filename, data: doc.output('blob') }).then(function () { say('Certificate saved as ' + filename + '.'); });
+          doc.save(filename); say('Your certificate download has started.');
+        });
+      }
+      doc.save(filename); say('Your certificate download has started.');
+    }).then(done, function (err) {
+      var code = err && err.code;
+      if (code === 'declined') say('Download cancelled. Tap the button to try again.');
+      else if (code === 'rate_limited') say('A save prompt is already open. Answer it, then try again.');
+      else if (!window.claude) { say('The PDF could not be created, so the print view is opening instead. Choose "Save as PDF" there.'); try { window.print(); } catch (e) {} }
+      else say('The PDF could not be created here. Check your connection and try again.');
+      done();
+    });
+  }
+
+  /* ---------- Boot ---------- */
+  function start() { S = freshState(); render(false); }
+  start();
+})();
+</script>
+</body>
+</html>
